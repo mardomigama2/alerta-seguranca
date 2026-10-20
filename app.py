@@ -112,7 +112,7 @@ if uploaded_file is not None:
                     try:
                         client = genai.Client(api_key=gemini_api_key)
                         response = client.models.generate_content(
-                            model="gemini-2.5-flash",
+                            model="gemini-3.8-flash",
                             contents=prompt,
                         )
                         texto_final_html = response.text.replace("```html", "").replace("```", "").strip()
