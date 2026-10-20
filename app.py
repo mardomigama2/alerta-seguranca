@@ -4,7 +4,7 @@ import smtplib
 from email.mime.text import MIMEText
 from email.mime.multipart import MIMEMultipart
 from datetime import date
-from openai import OpenAI
+from google import genai
 
 # Configuração da página
 st.set_page_config(
@@ -13,12 +13,12 @@ st.set_page_config(
     layout="wide"
 )
 
-st.title("🛡️ Sistema de Análise e Alertas Individuais de Segurança")
-st.markdown("Analise as ocorrências, defina o período e envie alertas focados (1 e-mail por tema) gerados por IA.")
+st.title("🛡️ Sistema de Análise e Alertas Individuais de Segurança (Gemini Gratuito)")
+st.markdown("Analise as ocorrências, defina o período e envie alertas focados (1 e-mail por tema) gerados pela IA do Gemini.")
 
 # --- SIDEBAR: Configurações de IA e E-mail ---
-st.sidebar.header("🤖 Configurações da IA (OpenAI)")
-openai_api_key = st.sidebar.text_input("Chave da API OpenAI (API Key)", type="password", help="Insira sua chave sk-...")
+st.sidebar.header("🤖 Configurações do Google Gemini (Gratuito)")
+gemini_api_key = st.sidebar.text_input("Chave da API Gemini", type="password", help="Obtenha gratuitamente em aistudio.google.com")
 
 st.sidebar.header("📧 Configurações de Envio de E-mail")
 enviar_email_real = st.sidebar.checkbox("Ativar envio real por e-mail", value=False)
@@ -83,9 +83,9 @@ if uploaded_file is not None:
                         delta=f"{row['Quantidade']} casos ({porcentagem:.1f}%)"
                     )
 
-            # --- GERAÇÃO DOS ALERTAS COM IA ---
+            # --- GERAÇÃO DOS ALERTAS COM GEMINI ---
             st.divider()
-            st.subheader("🤖 Alertas de Segurança Gerados por IA")
+            st.subheader("🤖 Alertas de Segurança Gerados por Gemini IA")
 
             alertas_gerados = []
 
@@ -94,7 +94,7 @@ if uploaded_file is not None:
                 pct = (row['Quantidade'] / total_ocorrencias) * 100
                 pct_str = f"{pct:.1f}%"
 
-                # Prompt para a IA aprimorar o texto mantendo a estrutura pedida
+                # Prompt para o Gemini aprimorar o texto
                 prompt = f"""
                 Você é um especialista em Segurança do Trabalho.
                 Crie a mensagem do alerta de segurança mantendo RIGOROSAMENTE a estrutura abaixo, mas aprimorando os detalhes técnicos do tema {tema}:
@@ -104,28 +104,27 @@ if uploaded_file is not None:
 
                 Instruções adicionais de melhoria da IA:
                 Após a mensagem padrão acima, adicione exatamente 3 marcadores curtos e práticos (bullet points) com orientações técnicas específicas sobre o tema "{tema}" para apoiar o líder no DDS, no Safety Tour e na Abordagem Comportamental.
-                Retorne o resultado final formatado de forma clara em HTML simples (use <p>, <ul>, <li> e <strong>).
+                Retorne o resultado final formatado em HTML simples (use <p>, <ul>, <li> e <strong>). Não inclua crases de markdown como ```html.
                 """
 
-                # Chamada da IA ou fallback caso não haja chave da API
-                if openai_api_key:
+                # Chamada do Gemini ou fallback simples sem IA
+                if gemini_api_key:
                     try:
-                        client = OpenAI(api_key=openai_api_key)
-                        response = client.chat.completions.create(
-                            model="gpt-4o-mini",
-                            messages=[{"role": "user", "content": prompt}],
-                            temperature=0.7
+                        client = genai.Client(api_key=gemini_api_key)
+                        response = client.models.generate_content(
+                            model="gemini-2.5-flash",
+                            contents=prompt,
                         )
-                        texto_final_html = response.choices[0].message.content
+                        texto_final_html = response.text.replace("```html", "").replace("```", "").strip()
                     except Exception as e:
-                        st.error(f"Erro na IA para o tema '{tema}': {e}")
+                        st.error(f"Erro no Gemini para o tema '{tema}': {e}")
                         texto_final_html = f"""
                         <p>Os nossos registros mostram que <strong>{pct_str}</strong> das ocorrências registradas entre os dias <strong>{data_inicio_str}</strong> e <strong>{data_fim_str}</strong>, alerta sobre o tema <strong>{tema}</strong>. Por isso, importante abordar no seu DDS sobre esse tema. Considerar também um olhar focado sobre {tema} durante o Safety Tour e tratar sobre {tema} comportamento na abordagem comportamental.</p>
                         """
                 else:
                     texto_final_html = f"""
                     <p>Os nossos registros mostram que <strong>{pct_str}</strong> das ocorrências registradas entre os dias <strong>{data_inicio_str}</strong> e <strong>{data_fim_str}</strong>, alerta sobre o tema <strong>{tema}</strong>. Por isso, importante abordar no seu DDS sobre esse tema. Considerar também um olhar focado sobre {tema} durante o Safety Tour e tratar sobre {tema} comportamento na abordagem comportamental.</p>
-                    <p><em>(Insira sua chave OpenAI na barra lateral para gerar orientações automáticas avançadas de IA).</em></p>
+                    <p><em>(Insira a sua chave do Gemini gratuita na barra lateral para sugestões automáticas).</em></p>
                     """
 
                 alertas_gerados.append({
@@ -143,7 +142,7 @@ if uploaded_file is not None:
             # --- DISPARO DOS E-MAILS INDIVIDUAIS ---
             st.divider()
             st.subheader("📬 Disparo Automático (1 E-mail por Tema)")
-            st.write("Ao clicar no botão abaixo, a plataforma enviará **3 e-mails independentes** para a equipe, um para cada tema em destaque.")
+            st.write("Ao clicar no botão abaixo, a plataforma enviará **3 e-mails independentes** para a equipe.")
 
             if st.button("🚀 Disparar os 3 Alertas de Segurança Individuais por E-mail"):
                 if enviar_email_real:
